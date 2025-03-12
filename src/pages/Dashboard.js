@@ -23,7 +23,7 @@ export default function Dashboard() {
         <div className="flex flex-col items-center min-h-screen bg-white p-6">
             {/* 상단 네비게이션 */}
             <div className="w-full flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">호서늘봄 관리자 페이지</h1>
+                <h1 className="text-3xl font-bold text-gray-900">호서늘봄 DASHBOARD</h1>
                 <button onClick={handleLogout} className="logout-button">
                     <LogOut size={24} className="text-gray-600 hover:text-red-500" />
                 </button>

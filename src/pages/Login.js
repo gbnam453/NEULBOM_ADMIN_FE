@@ -29,7 +29,7 @@ export default function Login() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-white">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">호서늘봄 관리자 페이지</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-6">호서늘봄 DASHBOARD</h1>
 
             <div className="login-box">
                 {/* 아이디 입력 */}
