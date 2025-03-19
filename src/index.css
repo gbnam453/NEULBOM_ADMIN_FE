@@ -16,6 +16,7 @@ code {
     monospace;
 }
 
+.bg-light-yellow-500 { background-color: #fff9E8; }
 .bg-gray-500 { background-color: #6b7280; }  /* 전체 */
 .bg-blue-500 { background-color: #3b82f6; }  /* 대전 */
 .bg-green-500 { background-color: #10b981; }  /* 서산 */

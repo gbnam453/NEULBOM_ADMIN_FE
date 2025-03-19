@@ -10,12 +10,9 @@ export default function NoticeAdmin() {
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
     const [region, setRegion] = useState("전체");
-    const navigate = useNavigate();
     const [openMenu, setOpenMenu] = useState(null); // 드롭다운 메뉴 상태
-
-    const toggleMenu = (id) => {
-        setOpenMenu(openMenu === id ? null : id);
-    };
+    const [timeLeft, setTimeLeft] = useState(0); // 초기값 0
+    const navigate = useNavigate();
 
     const regions = ["전체", "대전", "서산", "아산", "전라제주"];
 
@@ -28,17 +25,45 @@ export default function NoticeAdmin() {
         전라제주: "bg-red-500",
     };
 
+    // 로그인 여부 확인 및 logoutAt 설정, 그리고 즉시 초기 타이머 계산
     useEffect(() => {
         if (!localStorage.getItem("isAdmin")) {
             navigate("/");
         }
+        let logoutAt = localStorage.getItem("logoutAt");
+        if (!logoutAt) {
+            logoutAt = Date.now() + 600000; // 10분 후
+            localStorage.setItem("logoutAt", logoutAt);
+        }
+        // 초기 남은 시간 즉시 계산 후 state 업데이트
+        const initialTimeLeft = Math.floor((Number(logoutAt) - Date.now()) / 1000);
+        setTimeLeft(initialTimeLeft);
         fetchNotices();
-    }, []);
+    }, [navigate]);
+
+    // 1초마다 타이머 업데이트 및 자동 로그아웃 처리
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            const logoutAt = localStorage.getItem("logoutAt");
+            if (logoutAt) {
+                const remaining = Math.floor((Number(logoutAt) - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    localStorage.removeItem("isAdmin");
+                    localStorage.removeItem("logoutAt");
+                    navigate("/");
+                    clearInterval(intervalId);
+                } else {
+                    setTimeLeft(remaining);
+                }
+            }
+        }, 1000);
+        return () => clearInterval(intervalId);
+    }, [navigate]);
 
     const fetchNotices = async () => {
         try {
             const res = await axios.get(API_URL);
-            // ✅ 공지사항을 '내림차순' 정렬 (최신 공지가 가장 위)
+            // 최신 공지가 위에 오도록 내림차순 정렬
             const sortedNotices = res.data.sort((a, b) => b.id - a.id);
             setNotices(sortedNotices);
         } catch (error) {
@@ -56,7 +81,7 @@ export default function NoticeAdmin() {
             await axios.post(API_URL, newNotice);
             setTitle("");
             setContent("");
-            setRegion("전체"); // 기본값으로 초기화
+            setRegion("전체");
             fetchNotices();
         } catch (error) {
             console.error("공지 추가 실패:", error);
@@ -74,22 +99,34 @@ export default function NoticeAdmin() {
         }
     };
 
+    const toggleMenu = (id) => {
+        setOpenMenu(openMenu === id ? null : id);
+    };
+
+    // mm:ss 형식으로 남은 시간 표시
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    const formattedTime = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+
     return (
         <div className="max-w-xl mx-auto p-6 bg-white min-h-screen">
-            {/* ✅ 상단 네비게이션 바 (고정 및 중앙 정렬 적용) */}
+            {/* 상단 네비게이션 바 (고정 및 중앙 정렬) */}
             <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-md z-50">
-                <div className="max-w-xl mx-auto flex justify-center items-center p-4 relative">
-                    <button onClick={() => navigate("/dashboard")} className="absolute left-4 icon-button">
+                <div className="max-w-xl mx-auto flex justify-between items-center p-4">
+                    <button onClick={() => navigate("/dashboard")} className="icon-button">
                         <ArrowLeft size={24} className="text-gray-700 hover:text-gray-900 transition-all" />
                     </button>
-                    <h2 className="text-xl font-bold text-gray-900">공지사항</h2>
-                    <button onClick={fetchNotices} className="absolute right-4 icon-button">
+                    <div className="flex flex-col items-center">
+                        <h2 className="text-xl font-bold text-gray-900">공지사항</h2>
+                        <span className="text-sm text-gray-600">{formattedTime}</span>
+                    </div>
+                    <button onClick={fetchNotices} className="icon-button">
                         <RotateCcw size={24} className="text-gray-700 hover:text-gray-900 transition-all" />
                     </button>
                 </div>
             </div>
 
-            {/* ✅ 컨텐츠가 네비게이션에 가려지지 않도록 padding-top 추가 */}
+            {/* 네비게이션 영역이 가리지 않도록 padding-top 추가 */}
             <div className="pt-20">
                 {/* 입력 폼 */}
                 <div className="space-y-3">
@@ -106,7 +143,6 @@ export default function NoticeAdmin() {
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                     ></textarea>
-                    {/* 지역 선택 드롭다운 */}
                     <select className="input" value={region} onChange={(e) => setRegion(e.target.value)}>
                         {regions.map((r, index) => (
                             <option key={index} value={r}>

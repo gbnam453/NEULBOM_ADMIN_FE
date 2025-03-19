@@ -12,7 +12,7 @@ export default function Login() {
         const adminPw = process.env.REACT_APP_ADMIN_PW;
 
         if (username === adminId && password === adminPw) {
-            localStorage.setItem("isAdmin", "true"); // 로그인 성공 시 저장
+            localStorage.setItem("isAdmin", "true");
             navigate("/dashboard");
         } else {
             setError("아이디 또는 비밀번호가 올바르지 않아요");
@@ -28,32 +28,39 @@ export default function Login() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-white">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">호서늘봄 DASHBOARD</h1>
-
-            <div className="login-box">
-                {/* 아이디 입력 */}
+        <div className="flex items-center justify-center min-h-screen bg-white">
+            <div className="login-box flex flex-col items-center w-96 p-6 border rounded shadow">
+                {/* 로그인 박스 너비의 20% 크기로 로고 이미지 지정 */}
+                <img
+                    src="/logo_splash.png"
+                    alt="Logo"
+                    className="mb-4"
+                    style={{ width: "40%", height: "40%" }}
+                />
+                <h1 className="text-2xl font-bold text-gray-900 mb-6">호서늘봄 DASHBOARD</h1>
                 <input
                     type="text"
                     placeholder="아이디"
-                    className="login-input"
+                    className="login-input w-full p-2 mb-2 border rounded outline-none focus:ring-0 focus:border-gray-500"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    onKeyDown={handleKeyDown} // ✅ 엔터 감지
+                    onKeyDown={handleKeyDown}
                 />
-                {/* 비밀번호 입력 */}
                 <input
                     type="password"
                     placeholder="비밀번호"
-                    className="login-input"
+                    className="login-input w-full p-2 mb-2 border rounded outline-none focus:ring-0 focus:border-gray-500"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={handleKeyDown} // ✅ 엔터 감지
+                    onKeyDown={handleKeyDown}
                 />
-                {/* 오류 메시지 */}
-                {error && <p className="error-message">{error}</p>}
-                {/* 로그인 버튼 */}
-                <button onClick={handleLogin} className="login-button">로그인</button>
+                {error && <p className="error-message text-red-500 mb-2">{error}</p>}
+                <button
+                    onClick={handleLogin}
+                    className="login-button w-full px-4 py-2 bg-blue-500 text-white rounded"
+                >
+                    로그인
+                </button>
             </div>
         </div>
     );

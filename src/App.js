@@ -4,7 +4,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import NoticeAdmin from './pages/NoticeAdmin';
 import UploadAdmin from './pages/UploadAdmin';
-import DownloadAdmin from './pages/DownloadAdmin'; // 추가
+import DownloadAdmin from './pages/DownloadAdmin';
+import LinkAdmin from './pages/LinkAdmin'; // 추가
 
 export default function App() {
     return (
@@ -15,6 +16,7 @@ export default function App() {
                 <Route path="/notices" element={<NoticeAdmin />} />
                 <Route path="/uploads" element={<UploadAdmin />} />
                 <Route path="/downloads" element={<DownloadAdmin />} /> {/* 추가 */}
+                <Route path="/link" element={<LinkAdmin />} />
             </Routes>
         </Router>
     );
