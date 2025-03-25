@@ -1,41 +1,106 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, RotateCcw, MoreVertical } from "lucide-react"; // 아이콘 추가
+import {
+    ArrowLeft,
+    RotateCcw,
+    Eye,
+    Edit2,
+    Trash,
+    Plus,
+    ChevronDown,
+} from "lucide-react";
 
 const API_URL = "http://gbnam453.iptime.org:2401/api/uploads";
 
+// CustomSelect: OS에 상관없이 동일한 UI의 드롭다운 메뉴 제공
+function CustomSelect({ options, value, onChange, placeholder }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (ref.current && !ref.current.contains(event.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () =>
+            document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+    const handleSelect = (option) => {
+        onChange(option);
+        setOpen(false);
+    };
+    return (
+        <div className="relative w-full" ref={ref}>
+            <button
+                type="button"
+                className="border border-gray-300 rounded px-3 py-2 w-full text-left flex items-center justify-between"
+                onClick={() => setOpen(!open)}
+            >
+                <span>{value ? value.label : placeholder}</span>
+                <ChevronDown size={20} className="text-gray-600" />
+            </button>
+            {open && (
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow z-10">
+                    {options.map((option, index) => (
+                        <div
+                            key={index}
+                            onClick={() => handleSelect(option)}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                        >
+                            {option.label}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function UploadAdmin() {
     const [uploads, setUploads] = useState([]);
-    const [title, setTitle] = useState("");
-    const [detail, setDetail] = useState("");
-    const [type, setType] = useState("survey"); // 기본값: 설문
-    const [link, setLink] = useState("");
+    const [timeLeft, setTimeLeft] = useState(0);
     const navigate = useNavigate();
-    const [openMenu, setOpenMenu] = useState(null); // 드롭다운 메뉴 상태
-    const [timeLeft, setTimeLeft] = useState(0); // 초기값
 
-    const toggleMenu = (id) => {
-        setOpenMenu(openMenu === id ? null : id);
-    };
+    // 모달 상태: "add", "view", "edit" 또는 ""
+    const [modalType, setModalType] = useState("");
+    // 신규 등록 모달 상태
+    const [addForm, setAddForm] = useState({
+        title: "",
+        detail: "",
+        type: { label: "설문", value: "survey" },
+        link: "",
+    });
+    // view / edit 모달에서 선택된 업로드 항목
+    const [selectedUpload, setSelectedUpload] = useState(null);
+    // 수정 모달에서 사용할 데이터
+    const [editData, setEditData] = useState({
+        title: "",
+        detail: "",
+        type: { label: "설문", value: "survey" },
+        link: "",
+    });
 
-    const types = [
+    // 유형 옵션
+    const typeOptions = [
         { label: "설문", value: "survey" },
         { label: "파일", value: "file" },
     ];
 
+    // 초기 인증 체크 및 타이머, 업로드 목록 불러오기
     useEffect(() => {
         if (!localStorage.getItem("isAdmin")) {
             navigate("/");
         }
-        // logoutAt가 설정되어 있지 않으면 10분 후로 설정
         if (!localStorage.getItem("logoutAt")) {
             localStorage.setItem("logoutAt", Date.now() + 600000);
         }
-        // 즉시 남은 시간 계산 후 state 업데이트
         const logoutAt = localStorage.getItem("logoutAt");
         if (logoutAt) {
-            const initialTimeLeft = Math.floor((Number(logoutAt) - Date.now()) / 1000);
+            const initialTimeLeft = Math.floor(
+                (Number(logoutAt) - Date.now()) / 1000
+            );
             setTimeLeft(initialTimeLeft);
         }
         fetchUploads();
@@ -46,7 +111,9 @@ export default function UploadAdmin() {
         const intervalId = setInterval(() => {
             const logoutAt = localStorage.getItem("logoutAt");
             if (logoutAt) {
-                const remaining = Math.floor((Number(logoutAt) - Date.now()) / 1000);
+                const remaining = Math.floor(
+                    (Number(logoutAt) - Date.now()) / 1000
+                );
                 if (remaining <= 0) {
                     localStorage.removeItem("isAdmin");
                     localStorage.removeItem("logoutAt");
@@ -60,10 +127,10 @@ export default function UploadAdmin() {
         return () => clearInterval(intervalId);
     }, [navigate]);
 
+    // 업로드 목록 불러오기 (최신순 정렬)
     const fetchUploads = async () => {
         try {
             const res = await axios.get(API_URL);
-            // 업로드 내역을 내림차순 정렬 (최신 항목이 위)
             const sortedUploads = res.data.sort((a, b) => b.id - a.id);
             setUploads(sortedUploads);
         } catch (error) {
@@ -71,34 +138,86 @@ export default function UploadAdmin() {
         }
     };
 
+    // 신규 업로드 항목 등록
     const addUpload = async () => {
-        if (!title || !detail || !link)
-            return alert("제목, 설명, 링크를 입력하세요.");
-        if (!window.confirm("새로운 업로드 항목을 추가하시겠습니까?")) return;
-
-        const newUpload = { title, detail, type, link };
-
+        if (!addForm.title || !addForm.detail || !addForm.link)
+            return alert("제목, 설명, 링크를 입력해주세요.");
+        if (!window.confirm("새로운 서류를 추가할까요?")) return;
+        const newUpload = {
+            title: addForm.title,
+            detail: addForm.detail,
+            type: addForm.type.value,
+            link: addForm.link,
+        };
         try {
             await axios.post(API_URL, newUpload);
-            setTitle("");
-            setDetail("");
-            setType("survey");
-            setLink("");
+            setAddForm({
+                title: "",
+                detail: "",
+                type: { label: "설문", value: "survey" },
+                link: "",
+            });
+            closeModal();
             fetchUploads();
         } catch (error) {
             console.error("업로드 추가 실패:", error);
         }
     };
 
-    const deleteUpload = async (id) => {
-        if (!window.confirm("이 업로드 항목을 삭제하시겠습니까?")) return;
+    // 업로드 항목 수정
+    const handleUpdate = async () => {
+        if (!editData.title || !editData.detail || !editData.link)
+            return alert("제목, 설명, 링크를 입력하세요.");
+        if (!window.confirm("서류를 수정할까요?")) return;
+        const updatedUpload = {
+            title: editData.title,
+            detail: editData.detail,
+            type: editData.type.value,
+            link: editData.link,
+        };
+        try {
+            await axios.put(`${API_URL}/${selectedUpload.id}`, updatedUpload);
+            closeModal();
+            fetchUploads();
+        } catch (error) {
+            console.error("업로드 수정 실패:", error);
+        }
+    };
 
+    // 업로드 항목 삭제
+    const deleteUpload = async (id) => {
+        if (!window.confirm("서류를 삭제할까요?")) return;
         try {
             await axios.delete(`${API_URL}/${id}`);
             fetchUploads();
         } catch (error) {
             console.error("업로드 삭제 실패:", error);
         }
+    };
+
+    // 모달 열기: type이 "add", "view", "edit" 중 하나를 사용
+    const openModal = (type, upload = null) => {
+        setModalType(type);
+        if (upload) {
+            setSelectedUpload(upload);
+            if (type === "edit") {
+                setEditData({
+                    title: upload.title,
+                    detail: upload.detail,
+                    type:
+                        typeOptions.find((opt) => opt.value === upload.type) || {
+                            label: "설문",
+                            value: "survey",
+                        },
+                    link: upload.link,
+                });
+            }
+        }
+    };
+
+    const closeModal = () => {
+        setModalType("");
+        setSelectedUpload(null);
     };
 
     // 남은 시간을 mm:ss 형식으로 변환
@@ -109,134 +228,265 @@ export default function UploadAdmin() {
     ).padStart(2, "0")}`;
 
     return (
-        <div className="max-w-xl mx-auto p-6 bg-white min-h-screen">
-            {/* 상단 네비게이션 바 (중앙 정렬) */}
-            <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-md z-50">
-                <div className="max-w-xl mx-auto flex flex-col justify-center items-center p-4 relative">
-                    <button
-                        onClick={() => navigate("/dashboard")}
-                        className="absolute left-4 icon-button"
-                    >
-                        <ArrowLeft
-                            size={24}
-                            className="text-gray-700 hover:text-gray-900 transition-all"
-                        />
+        <div className="min-h-screen bg-gray-100 relative">
+            {/* 헤더 */}
+            <header className="fixed top-0 left-0 right-0 bg-white shadow p-4 z-50">
+                <div className="relative flex items-center justify-between">
+                    <button onClick={() => navigate("/dashboard")} className="p-2">
+                        <ArrowLeft size={24} className="text-gray-700" />
                     </button>
-                    <h2 className="text-xl font-bold text-gray-900">서류제출</h2>
-                    {/* 추가 텍스트 없이 formattedTime만 표시 */}
-                    <span className="text-sm text-gray-600">{formattedTime}</span>
-                    <button onClick={fetchUploads} className="absolute right-4 icon-button">
-                        <RotateCcw
-                            size={24}
-                            className="text-gray-700 hover:text-gray-900 transition-all"
-                        />
-                    </button>
+                    <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-bold">
+                        서류제출
+                    </h1>
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">{formattedTime}</span>
+                        <button onClick={fetchUploads} className="p-2">
+                            <RotateCcw size={24} className="text-gray-700" />
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </header>
 
-            {/* 네비게이션 영역이 가리지 않도록 padding-top 추가 */}
-            <div className="pt-20">
-                {/* 입력 폼 */}
-                <div className="space-y-3">
-                    <input
-                        type="text"
-                        placeholder="제목"
-                        className="input"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                    />
-                    <input
-                        type="text"
-                        placeholder="설명"
-                        className="input"
-                        value={detail}
-                        onChange={(e) => setDetail(e.target.value)}
-                    />
-                    <select
-                        className="input"
-                        value={type}
-                        onChange={(e) => setType(e.target.value)}
-                    >
-                        {types.map((t, index) => (
-                            <option key={index} value={t.value}>
-                                {t.label}
-                            </option>
-                        ))}
-                    </select>
-                    <input
-                        type="text"
-                        placeholder="링크 (URL)"
-                        className="input"
-                        value={link}
-                        onChange={(e) => setLink(e.target.value)}
-                    />
-                    <button onClick={addUpload} className="btn-primary">
-                        업로드 추가
-                    </button>
-                </div>
-
-                {/* 업로드 리스트 */}
-                <ul className="mt-6 space-y-3">
-                    {uploads.map((upload) => (
-                        <li
+            {/* 메인 콘텐츠: 업로드 카드 목록 */}
+            <main className="pt-20 px-4 pb-20">
+                {uploads.length === 0 ? (
+                    <p className="text-center text-gray-600">
+                        등록된 서류가 없거나 서버와 연결할 수 없어요.
+                    </p>
+                ) : (
+                    uploads.map((upload) => (
+                        <div
                             key={upload.id}
-                            className="flex items-center bg-white p-4 rounded-lg shadow-sm relative"
+                            className="bg-white shadow rounded-lg p-4 mb-4 flex items-center"
                         >
-                            {/* 타입 표시 (색상 적용) */}
-                            <span
-                                className={`px-3 py-2 text-sm text-white rounded whitespace-nowrap ${
-                                    upload.type === "survey" ? "bg-blue-500" : "bg-green-500"
-                                }`}
-                            >
+              <span
+                  className={`px-3 py-1 text-sm text-white rounded ${
+                      upload.type === "survey" ? "bg-blue-500" : "bg-green-500"
+                  }`}
+              >
                 {upload.type === "survey" ? "설문" : "파일"}
               </span>
-
-                            {/* 제목 및 설명 */}
-                            <div className="ml-4 flex flex-col flex-grow overflow-hidden">
-                <span className="font-semibold text-lg truncate">
-                  {upload.title}
-                </span>
-                                <span className="text-gray-500 text-sm truncate">
-                  {upload.detail}
-                </span>
+                            <div className="ml-4 flex-grow">
+                                <h2 className="font-bold text-lg">{upload.title}</h2>
+                                <p className="text-gray-500 text-sm">{upload.detail}</p>
                             </div>
-
-                            {/* 우측: 더보기 버튼 */}
-                            <div className="relative">
+                            <div className="flex items-center space-x-3">
                                 <button
-                                    onClick={() => toggleMenu(upload.id)}
-                                    className="icon-button"
+                                    onClick={() => openModal("view", upload)}
+                                    title="내용확인"
                                 >
-                                    <MoreVertical
-                                        size={24}
-                                        className="text-gray-700 hover:text-gray-900 transition-all"
+                                    <Eye
+                                        size={20}
+                                        className="text-gray-700 hover:text-blue-500"
                                     />
                                 </button>
-
-                                {/* 드롭다운 메뉴 */}
-                                {openMenu === upload.id && (
-                                    <div className="absolute right-0 mt-2 w-24 bg-white shadow-lg rounded-md py-1 z-10">
-                                        <a
-                                            href={upload.link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                        >
-                                            보기
-                                        </a>
-                                        <button
-                                            onClick={() => deleteUpload(upload.id)}
-                                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                                        >
-                                            삭제
-                                        </button>
-                                    </div>
-                                )}
+                                <button
+                                    onClick={() => openModal("edit", upload)}
+                                    title="수정"
+                                >
+                                    <Edit2
+                                        size={20}
+                                        className="text-gray-700 hover:text-blue-500"
+                                    />
+                                </button>
+                                <button
+                                    onClick={() => deleteUpload(upload.id)}
+                                    title="삭제"
+                                >
+                                    <Trash
+                                        size={20}
+                                        className="text-red-600 hover:text-red-800"
+                                    />
+                                </button>
                             </div>
-                        </li>
-                    ))}
-                </ul>
-            </div>
+                        </div>
+                    ))
+                )}
+            </main>
+
+            {/* 오른쪽 아래 플로팅 버튼: 신규 등록 모달 오픈 */}
+            <button
+                onClick={() => openModal("add")}
+                className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg"
+                title="새 항목 추가"
+            >
+                <Plus size={24} />
+            </button>
+
+            {/* 신규 등록 모달 */}
+            {modalType === "add" && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+                    <div className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6">
+                        <h2 className="text-xl font-bold mb-4">서류 추가</h2>
+                        <input
+                            type="text"
+                            placeholder="제목"
+                            className="border border-gray-300 rounded px-3 py-2 w-full mb-2"
+                            value={addForm.title}
+                            onChange={(e) =>
+                                setAddForm({ ...addForm, title: e.target.value })
+                            }
+                        />
+                        <input
+                            type="text"
+                            placeholder="설명"
+                            className="border border-gray-300 rounded px-3 py-2 w-full mb-2"
+                            value={addForm.detail}
+                            onChange={(e) =>
+                                setAddForm({ ...addForm, detail: e.target.value })
+                            }
+                        />
+                        <div className="mb-2">
+                            <CustomSelect
+                                options={typeOptions}
+                                value={addForm.type}
+                                onChange={(option) =>
+                                    setAddForm({ ...addForm, type: option })
+                                }
+                                placeholder="유형 선택"
+                            />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="링크 (URL)"
+                            className="border border-gray-300 rounded px-3 py-2 w-full mb-4"
+                            value={addForm.link}
+                            onChange={(e) =>
+                                setAddForm({ ...addForm, link: e.target.value })
+                            }
+                        />
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={addUpload}
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 flex-1"
+                            >
+                                등록
+                            </button>
+                            <button
+                                onClick={closeModal}
+                                className="bg-gray-300 hover:bg-gray-400 text-gray-800 rounded px-4 py-2 flex-1"
+                            >
+                                취소
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 내용확인 모달 */}
+            {modalType === "view" && selectedUpload && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+                    <div className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6">
+                        <h2 className="text-2xl font-bold mb-6">서류 정보</h2>
+                        <div className="space-y-5">
+                            <div>
+                                <div className="text-lg font-semibold text-gray-800">
+                                    제목
+                                </div>
+                                <div className="text-gray-700 mt-1">
+                                    {selectedUpload.title}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-lg font-semibold text-gray-800">
+                                    설명
+                                </div>
+                                <div className="text-gray-700 mt-1">
+                                    {selectedUpload.detail}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-lg font-semibold text-gray-800">
+                                    유형
+                                </div>
+                                <div className="text-gray-700 mt-1">
+                                    {selectedUpload.type === "survey" ? "설문" : "파일"}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-lg font-semibold text-gray-800">
+                                    링크
+                                </div>
+                                <div className="text-blue-500 mt-1 break-all">
+                                    <a
+                                        href={selectedUpload.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        {selectedUpload.link}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={closeModal}
+                            className="bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 w-full mt-8"
+                        >
+                            닫기
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 수정 모달 */}
+            {modalType === "edit" && selectedUpload && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+                    <div className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6">
+                        <h2 className="text-xl font-bold mb-4">서류 수정</h2>
+                        <input
+                            type="text"
+                            placeholder="제목"
+                            className="border border-gray-300 rounded px-3 py-2 w-full mb-2"
+                            value={editData.title}
+                            onChange={(e) =>
+                                setEditData({ ...editData, title: e.target.value })
+                            }
+                        />
+                        <input
+                            type="text"
+                            placeholder="설명"
+                            className="border border-gray-300 rounded px-3 py-2 w-full mb-2"
+                            value={editData.detail}
+                            onChange={(e) =>
+                                setEditData({ ...editData, detail: e.target.value })
+                            }
+                        />
+                        <div className="mb-2">
+                            <CustomSelect
+                                options={typeOptions}
+                                value={editData.type}
+                                onChange={(option) =>
+                                    setEditData({ ...editData, type: option })
+                                }
+                                placeholder="유형 선택"
+                            />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="링크 (URL)"
+                            className="border border-gray-300 rounded px-3 py-2 w-full mb-4"
+                            value={editData.link}
+                            onChange={(e) =>
+                                setEditData({ ...editData, link: e.target.value })
+                            }
+                        />
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={handleUpdate}
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 flex-1"
+                            >
+                                저장
+                            </button>
+                            <button
+                                onClick={closeModal}
+                                className="bg-gray-300 hover:bg-gray-400 text-gray-800 rounded px-4 py-2 flex-1"
+                            >
+                                취소
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
