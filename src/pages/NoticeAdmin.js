@@ -69,7 +69,7 @@ export default function NoticeAdmin() {
     // 모달 상태: "add", "view", "edit" 또는 ""
     const [modalType, setModalType] = useState("");
 
-    // 공지사항 추가 모달에서 사용할 상태
+    // 공지사항 추가 모달 상태
     const [addForm, setAddForm] = useState({
         title: "",
         content: "",
@@ -81,7 +81,7 @@ export default function NoticeAdmin() {
     // view / edit 모달에서 선택된 공지사항
     const [selectedNotice, setSelectedNotice] = useState(null);
 
-    // edit 모달에서 수정할 데이터
+    // 수정 모달에서 사용할 데이터
     const [editData, setEditData] = useState({
         title: "",
         content: "",
@@ -93,10 +93,10 @@ export default function NoticeAdmin() {
     // 업로드 진행률 (퍼센트)
     const [uploadProgress, setUploadProgress] = useState(0);
 
-    // 상세보기 모달에서 해당 공지의 이미지 목록
+    // 모달에서 현재 업로드된 이미지 목록
     const [viewImages, setViewImages] = useState([]);
 
-    // 지역 옵션 (CustomSelect 사용)
+    // 지역 옵션
     const regions = ["전체", "대전", "서산", "아산", "전라제주"];
     const regionColors = {
         전체: "bg-gray-500",
@@ -139,8 +139,9 @@ export default function NoticeAdmin() {
         return () => clearInterval(intervalId);
     }, [navigate]);
 
+    // 모달 타입이 "view" 또는 "edit"일 때 선택된 공지의 이미지를 불러옴
     useEffect(() => {
-        if (modalType === "view" && selectedNotice) {
+        if ((modalType === "view" || modalType === "edit") && selectedNotice) {
             axios
                 .get(`${API_URL}/${selectedNotice.id}/images`)
                 .then((res) => setViewImages(res.data))
@@ -229,7 +230,19 @@ export default function NoticeAdmin() {
             await axios.delete(`${API_URL}/${id}`);
             fetchNotices();
         } catch (error) {
-            console.error("공지사항 삭제 실패:", error);
+            console.error("공지사항을 삭제하는데 실패했습니다.\n", error);
+        }
+    };
+
+    // 개별 이미지 삭제 함수
+    const handleDeleteImage = async (imageId) => {
+        if (!window.confirm("이 이미지를 삭제하시겠습니까?")) return;
+        try {
+            await axios.delete(`${API_URL}/${selectedNotice.id}/images/${imageId}`);
+            setViewImages(viewImages.filter(img => img.id !== imageId));
+        } catch (error) {
+            console.error("이미지 삭제 실패:", error);
+            alert("이미지 삭제에 실패했습니다.");
         }
     };
 
@@ -256,9 +269,7 @@ export default function NoticeAdmin() {
 
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
-    const formattedTime = `${String(minutes).padStart(2, "0")}:${String(
-        seconds
-    ).padStart(2, "0")}`;
+    const formattedTime = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
     return (
         <div className="min-h-screen bg-gray-100 relative">
@@ -349,7 +360,7 @@ export default function NoticeAdmin() {
                 <Plus size={24} />
             </button>
 
-            {/* 모달: 신규 공지사항 추가 */}
+            {/* 모달: 공지사항 추가 */}
             {modalType === "add" && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
                     <div className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6">
@@ -437,7 +448,7 @@ export default function NoticeAdmin() {
                 </div>
             )}
 
-            {/* 모달: 공지사항 내용 확인 */}
+            {/* 모달: 공지사항 내용 확인 (view) */}
             {modalType === "view" && selectedNotice && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
                     <div className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6 overflow-y-auto">
@@ -457,7 +468,7 @@ export default function NoticeAdmin() {
                             </div>
                             <div>
                                 <div className="text-lg font-semibold text-gray-800">내용</div>
-                                <div className="text-gray-700 mt-1">
+                                <div className="text-gray-700 mt-1 whitespace-pre-wrap" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                                     {selectedNotice.content}
                                 </div>
                             </div>
@@ -466,15 +477,16 @@ export default function NoticeAdmin() {
                                 {viewImages.length > 0 ? (
                                     <div className="mt-2 flex space-x-2 overflow-x-auto">
                                         {viewImages.map((img, index) => (
-                                            <img
-                                                key={index}
-                                                src={img.imageUrl}
-                                                alt={`공지사항 ${index + 1}`}
-                                                className="w-24 h-24 object-cover cursor-pointer"
-                                                onClick={() =>
-                                                    window.open(img.imageUrl, "_blank")
-                                                }
-                                            />
+                                            <div key={img.id} className="relative">
+                                                <img
+                                                    src={img.imageUrl}
+                                                    alt={`공지사항 ${index + 1}`}
+                                                    className="w-24 h-24 object-cover cursor-pointer rounded"
+                                                    onClick={() =>
+                                                        window.open(img.imageUrl, "_blank")
+                                                    }
+                                                />
+                                            </div>
                                         ))}
                                     </div>
                                 ) : (
@@ -492,10 +504,10 @@ export default function NoticeAdmin() {
                 </div>
             )}
 
-            {/* 모달: 공지사항 수정 */}
+            {/* 모달: 공지사항 수정 (edit) */}
             {modalType === "edit" && selectedNotice && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
-                    <div className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6">
+                    <div className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6 overflow-y-auto">
                         <h2 className="text-xl font-bold mb-4">공지사항 수정</h2>
                         <input
                             type="text"
@@ -524,24 +536,44 @@ export default function NoticeAdmin() {
                                 placeholder="지역 선택"
                             />
                         </div>
+                        {/* 현재 업로드된 이미지들 (삭제 가능 및 추가 버튼 포함) */}
                         <div className="mb-4">
-                            <label className="block mb-1 font-semibold">
-                                추가 이미지 업로드
-                            </label>
-                            <button
-                                className="btn-primary"
-                                onClick={() => editFileInputRef.current.click()}
-                            >
-                                파일 선택
-                            </button>
+                            <div className="text-lg font-semibold text-gray-800 mb-1">현재 이미지</div>
+                            <div className="flex space-x-2 overflow-x-auto">
+                                {viewImages.length > 0 &&
+                                    viewImages.map((img, index) => (
+                                        <div key={img.id} className="relative">
+                                            <img
+                                                src={img.imageUrl}
+                                                alt={`공지사항 ${index + 1}`}
+                                                className="w-24 h-24 object-cover cursor-pointer rounded"
+                                            />
+                                            <button
+                                                onClick={() => handleDeleteImage(img.id)}
+                                                className="absolute top-0 right-0 bg-red-600 text-white text-xs flex items-center justify-center w-6 h-6 rounded-full"
+                                            >
+                                                X
+                                            </button>
+                                        </div>
+                                    ))
+                                }
+                                {/* 추가 이미지 업로드를 위한 + 버튼 */}
+                                <div
+                                    className="relative flex-shrink-0 w-24 h-24 border-2 border-dashed border-gray-400 rounded flex items-center justify-center cursor-pointer"
+                                    onClick={() => editFileInputRef.current.click()}
+                                >
+                                    <Plus size={24} className="text-gray-400" />
+                                </div>
+                            </div>
+                        </div>
+                        {/* 추가 이미지 업로드 */}
+                        <div className="mb-4">
                             <input
                                 type="file"
                                 multiple
                                 ref={editFileInputRef}
                                 className="hidden"
-                                onChange={(e) =>
-                                    setEditFiles([...e.target.files])
-                                }
+                                onChange={(e) => setEditFiles([...e.target.files])}
                             />
                             {editFiles.length > 0 && (
                                 <p className="text-sm text-gray-600 mt-1">
